@@ -1,0 +1,10 @@
+{
+	"scripts": {
+		"dev": "cd /Applications/HBuilderX.app/Contents/HBuilderX/plugins/uniapp-cli/ && cross-env UNI_INPUT_DIR=/Users/hens/code-space/uniapp-virtual-list/ UNI_OUTPUT_DIR=/Users/hens/code-space/uniapp-virtual-list/unpackage/dist/dev/h5 UNI_PLATFORM=h5 NODE_ENV=development /Applications/HBuilderX.app/Contents/HBuilderX/plugins/node/node --max-old-space-size=2048 bin/uniapp-cli.js"
+	},
+	"dependencies": {},
+	"devDependencies": {
+		"@biomejs/biome": "^1.8.3",
+		"cross-env": "^7.0.3"
+	}
+}
