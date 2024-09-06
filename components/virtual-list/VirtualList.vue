@@ -1,9 +1,21 @@
 <template>
-  <scroll-view class="virtual-list" :scroll-y="true" @scroll="onScroll">
-    <view class="list-container" :style="{height: totalHeight+'px'}">
-      <slot :items="visibleItems"/>
+  <view class="wrapper-container">
+    <scroll-view class="virtual-list" :scroll-y="true" @scroll="onScroll" :scroll-top="virtualListScrollTop"  scroll-with-animation>
+      <view class="list-container" :style="{ height: totalHeight + 'px' }">
+        <slot :items="visibleItems" />
+      </view>
+    </scroll-view>
+
+    <view class="slider-container">
+      <view 
+        class="slider"
+        :style="{ top: sliderPosition + 'px' }"
+        @touchstart="onSliderTouchStart"
+        @touchmove="onSliderTouchMove"
+        @touchend="onSliderTouchEnd"
+      ></view>
     </view>
-  </scroll-view>
+  </view>
 </template>
 
 
@@ -32,7 +44,15 @@ export default {
 			itemHeights: {},
 			lastScrollTop: 0,
 			totalHeight: 0,
+			sliderPosition: 0,
+			isDragging: false,
+			virtualListScrollTop: 0,
 		}
+	},
+	computed: {
+		sliderHeight() {
+			return (this.containerHeight / this.totalHeight) * this.containerHeight
+		},
 	},
 	provide() {
 		return {
@@ -93,29 +113,17 @@ export default {
 		},
 		updateVisibleItems(scrollTop) {
 			this.lastScrollTop = scrollTop
-			let currentTop = 0
-			let startIndex = 0
-			let endIndex = this.data.length - 1 // 默认设置为最后一个元素的索引
+			const startIndex = this.findStartIndex(scrollTop)
+			const endIndex = this.findEndIndex(
+				scrollTop + this.containerHeight,
+				startIndex,
+			)
 
-			// Find start index
-			for (let i = 0; i < this.data.length; i++) {
-				if (currentTop > scrollTop) {
-					startIndex = Math.max(0, i - 1)
-					break
-				}
-				currentTop += this.itemHeights[this.data[i].id] || this.estimatedHeight
-			}
-
-			// Find end index
-			currentTop = 0
-			for (let i = 0; i < this.data.length; i++) {
-				currentTop += this.itemHeights[this.data[i].id] || this.estimatedHeight
-				if (currentTop > scrollTop + this.containerHeight) {
-					endIndex = Math.min(this.data.length - 1, i + 1)
-					break
-				}
-			}
-
+			console.log(
+				"🚀 ~ updateVisibleItems ~ rangeChange:",
+				startIndex,
+				endIndex + 1,
+			)
 			this.$emit("rangeChange", {
 				startIndex,
 				endIndex: endIndex + 1,
@@ -128,24 +136,120 @@ export default {
 					top: this.getItemTop(item.id),
 				}))
 		},
+		findStartIndex(scrollTop) {
+			let low = 0
+			let high = this.data.length - 1
+
+			while (low <= high) {
+				const mid = Math.floor((low + high) / 2)
+				const itemTop = this.getItemTop(this.data[mid].id)
+
+				if (itemTop > scrollTop) {
+					high = mid - 1
+				} else if (
+					itemTop +
+						(this.itemHeights[this.data[mid].id] || this.estimatedHeight) <=
+					scrollTop
+				) {
+					low = mid + 1
+				} else {
+					return mid
+				}
+			}
+
+			return Math.max(0, low - 1)
+		},
+		findEndIndex(bottomEdge, startIndex) {
+			let endIndex = startIndex
+			let currentBottom =
+				this.getItemTop(this.data[startIndex].id) +
+				(this.itemHeights[this.data[startIndex].id] || this.estimatedHeight)
+
+			while (endIndex < this.data.length - 1 && currentBottom < bottomEdge) {
+				endIndex++
+				currentBottom +=
+					this.itemHeights[this.data[endIndex].id] || this.estimatedHeight
+			}
+
+			return Math.min(this.data.length - 1, endIndex)
+		},
+
 		onScroll: throttle(
 			function (e) {
 				const { scrollTop } = e.detail
 				this.updateVisibleItems(scrollTop)
+				// this.updateSliderPosition(scrollTop)
 			},
 			20,
 			{ heading: true },
 		),
+		onSliderTouchStart(e) {
+			this.isDragging = true
+		},
+
+		onSliderTouchMove(e) {
+			if (!this.isDragging) return
+			const touch = e.touches[0]
+			let newPosition = touch.clientY - this.sliderHeight / 2
+			newPosition = Math.max(
+				0,
+				Math.min(newPosition, this.containerHeight - this.sliderHeight),
+			)
+			console.log("🚀 ~ onSliderTouchMove ~ newPosition:", newPosition)
+			this.sliderPosition = newPosition
+
+			const scrollPercentage =
+				newPosition / (this.containerHeight - this.sliderHeight)
+			const scrollTop =
+				scrollPercentage * (this.totalHeight - this.containerHeight)
+			this.virtualListScrollTop = scrollTop
+		},
+
+		onSliderTouchEnd() {
+			this.isDragging = false
+		},
+
+		updateSliderPosition(scrollTop) {
+			const scrollPercentage =
+				scrollTop / (this.totalHeight - this.containerHeight)
+			this.sliderPosition =
+				scrollPercentage * (this.containerHeight - this.sliderHeight)
+		},
 	},
 }
 </script>
 
 <style lang="scss" scoped>
-.virtual-list {
+.wrapper-container {
   height: 100%;
+  display: flex;
 
-  .list-container{
+
+  .virtual-list {
+    height: 100%;
+
+    .list-container {
+      position: relative;
+    }
+  }
+  
+  .slider-container {
+    width: 20px;
+    height: 100%;
     position: relative;
+    background-color: #f0f0f0;
+    border-radius: 10px;
+
+
+    .slider {
+      width: 100%;
+      background-color: pink;
+      position: absolute;
+      border-radius: 20px;
+      left: 0px;
+      height: 20px;
+      width: 20px;
+    }
   }
 }
 </style>
