@@ -2,8 +2,8 @@
   <view class="wrapper-container">
     <scroll-view class="virtual-list" :scroll-y="true" @scroll="onScroll" :scroll-top="virtualListScrollTop"
       scroll-with-animation>
-      <view class="list-container" :style="{ height: totalHeight + 'px' }">
-        <slot :items="sortedVisibleItems" />
+      <view class="list-container" :style="{ height: totalHeight + 'px', paddingTop: topPadding + 'px' }">
+        <slot :items="visibleItems" />
       </view>
     </scroll-view>
 
@@ -47,6 +47,7 @@ export default {
 			bufferSize: 10, // 新增：缓冲区大小
 			updateQueue: [],
 			isUpdating: false,
+			topPadding: 0,
 		}
 	},
 	mounted() {
@@ -194,14 +195,14 @@ export default {
 			}
 
 			this.isUpdating = true
-			console.log("🚀 ~ processUpdateQueue ~ isUpdating:", true)
+			// console.log("🚀 ~ processUpdateQueue ~ isUpdating:", true)
 			const scrollTop = this.updateQueue[this.updateQueue.length - 1] // Get the latest scroll position
 			this.updateQueue = [] // Clear the queue
 
 			this.throttledUpdateVisibleItems(scrollTop, () => {
 				setTimeout(() => {
 					this.isUpdating = false
-					console.log("🚀 ~ processUpdateQueue ~ isUpdating:", false)
+					// console.log("🚀 ~ processUpdateQueue ~ isUpdating:", false)
 					if (this.updateQueue.length > 0) {
 						this.processUpdateQueue() // Process any new updates that came in
 					}
@@ -214,12 +215,12 @@ export default {
 				this.updateVisibleItems(scrollTop)
 				if (callback) callback()
 			},
-			50,
+			100,
 			{ leading: true },
 		),
 
 		async updateVisibleItems(scrollTop) {
-			console.log("🚀 ~ updateVisibleItems ~ scrollTop:", scrollTop)
+			// console.log("🚀 ~ updateVisibleItems ~ scrollTop:", scrollTop)
 
 			const startIndex = Math.max(
 				0,
@@ -230,6 +231,8 @@ export default {
 				this.findEndIndex(scrollTop + this.containerHeight, startIndex) +
 					this.bufferSize,
 			)
+
+			this.topPadding = this.getItemTop(this.data[startIndex].id)
 
 			const newVisibleItems = this.data
 				.slice(startIndex, endIndex + 1)
@@ -244,7 +247,7 @@ export default {
 					(item) => item.id === newItem.id,
 				)
 				if (existingItem && existingItem.height === newItem.height) {
-					return existingItem // 如果 id 和高度都没变，保留现��项
+					return existingItem // 如果 id 和高度都没变，保留现有项
 				}
 				return newItem // 否则使用新项
 			})
@@ -271,9 +274,9 @@ export default {
   height: 100%;
   display: flex;
 
-
   .virtual-list {
     height: 100%;
+    flex-grow: 1;
 
     .list-container {
       position: relative;
