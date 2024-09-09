@@ -1,19 +1,14 @@
 <template>
   <view class="wrapper-container">
-    <scroll-view class="virtual-list" :scroll-y="true" @scroll="onScroll" :scroll-top="virtualListScrollTop"  scroll-with-animation>
+    <scroll-view class="virtual-list" :scroll-y="true" @scroll="onScroll" :scroll-top="virtualListScrollTop"
+      scroll-with-animation>
       <view class="list-container" :style="{ height: totalHeight + 'px' }">
-        <slot :items="visibleItems" />
+        <slot :items="sortedVisibleItems" />
       </view>
     </scroll-view>
 
     <view class="slider-container">
-      <view 
-        class="slider"
-        :style="{ top: sliderPosition + 'px' }"
-        @touchstart="onSliderTouchStart"
-        @touchmove="onSliderTouchMove"
-        @touchend="onSliderTouchEnd"
-      ></view>
+      <Slider v-model="sliderPercentage" @input="onSliderChange" @dragging="onSliderDragging" />
     </view>
   </view>
 </template>
@@ -21,9 +16,13 @@
 
 <script>
 import { throttle } from "./utils"
+import Slider from "./Slider.vue"
 
 export default {
 	name: "VirtualList",
+	components: {
+		Slider,
+	},
 	props: {
 		data: {
 			type: Array,
@@ -37,26 +36,23 @@ export default {
 	data() {
 		return {
 			containerHeight: 0,
-			itemHeight: 100,
 			visibleItems: [],
 			startIndex: 0,
 			endIndex: 0,
 			itemHeights: {},
 			lastScrollTop: 0,
 			totalHeight: 0,
-			sliderPosition: 0,
-			isDragging: false,
 			virtualListScrollTop: 0,
+			sliderPercentage: 0,
+			isDragging: false,
+			bufferSize: 5, // 新增：缓冲区大小
+			calculatedHeights: {}, // New property to store calculated heights
 		}
-	},
-	computed: {
-		sliderHeight() {
-			return (this.containerHeight / this.totalHeight) * this.containerHeight
-		},
 	},
 	provide() {
 		return {
 			updateItemHeight: this.updateItemHeight,
+			getItemHeightIsCalculated: this.getItemHeightIsCalculated,
 		}
 	},
 	mounted() {
@@ -65,12 +61,17 @@ export default {
 	},
 	watch: {
 		data: {
-			handler(newVal, oldVal) {
+			handler() {
 				this.initializeItemHeights()
 				this.updateVisibleItems(this.lastScrollTop || 0)
 			},
 			deep: true,
 			immediate: true,
+		},
+	},
+	computed: {
+		sortedVisibleItems() {
+			return this.visibleItems.slice().sort((a, b) => a.top - b.top)
 		},
 	},
 	methods: {
@@ -79,7 +80,10 @@ export default {
 			query
 				.select(".virtual-list")
 				.boundingClientRect((res) => {
-					this.containerHeight = res.height
+					if (res) {
+						this.containerHeight = res.height
+						this.updateVisibleItems(0)
+					}
 				})
 				.exec()
 		},
@@ -90,7 +94,11 @@ export default {
 			}, {})
 			this.updateTotalHeight()
 		},
+		getItemHeightIsCalculated(id) {
+			return this.calculatedHeights[id]
+		},
 		updateItemHeight(id, height) {
+			this.calculatedHeights[id] = true
 			this.itemHeights[id] = height
 			this.updateTotalHeight()
 			this.updateVisibleItems(this.lastScrollTop || 0)
@@ -113,17 +121,16 @@ export default {
 		},
 		updateVisibleItems(scrollTop) {
 			this.lastScrollTop = scrollTop
-			const startIndex = this.findStartIndex(scrollTop)
-			const endIndex = this.findEndIndex(
-				scrollTop + this.containerHeight,
-				startIndex,
+			const startIndex = Math.max(
+				0,
+				this.findStartIndex(scrollTop) - this.bufferSize,
+			)
+			const endIndex = Math.min(
+				this.data.length - 1,
+				this.findEndIndex(scrollTop + this.containerHeight, startIndex) +
+					this.bufferSize,
 			)
 
-			console.log(
-				"🚀 ~ updateVisibleItems ~ rangeChange:",
-				startIndex,
-				endIndex + 1,
-			)
 			this.$emit("rangeChange", {
 				startIndex,
 				endIndex: endIndex + 1,
@@ -135,11 +142,24 @@ export default {
 					...item,
 					top: this.getItemTop(item.id),
 				}))
+
+			// 新增：预加载项目
+			this.preloadItems(startIndex, endIndex)
 		},
 		findStartIndex(scrollTop) {
-			let low = 0
+			// 使用预设高度估算初始 low 值
+			let low = Math.floor(scrollTop / this.estimatedHeight)
 			let high = this.data.length - 1
 
+			// 确保 low 不会超出范围
+			low = Math.min(low, high)
+
+			// 如果估算的位置已经超过了 scrollTop，向上查找正确的起始位置
+			while (low > 0 && this.getItemTop(this.data[low].id) > scrollTop) {
+				low--
+			}
+
+			// 二分查找
 			while (low <= high) {
 				const mid = Math.floor((low + high) / 2)
 				const itemTop = this.getItemTop(this.data[mid].id)
@@ -174,46 +194,62 @@ export default {
 			return Math.min(this.data.length - 1, endIndex)
 		},
 
-		onScroll: throttle(
-			function (e) {
-				const { scrollTop } = e.detail
+		throttleUpdateVisibleItems: throttle(
+			function (scrollTop) {
 				this.updateVisibleItems(scrollTop)
-				// this.updateSliderPosition(scrollTop)
 			},
 			20,
 			{ heading: true },
 		),
-		onSliderTouchStart(e) {
-			this.isDragging = true
-		},
-
-		onSliderTouchMove(e) {
-			if (!this.isDragging) return
-			const touch = e.touches[0]
-			let newPosition = touch.clientY - this.sliderHeight / 2
-			newPosition = Math.max(
-				0,
-				Math.min(newPosition, this.containerHeight - this.sliderHeight),
-			)
-			console.log("🚀 ~ onSliderTouchMove ~ newPosition:", newPosition)
-			this.sliderPosition = newPosition
-
-			const scrollPercentage =
-				newPosition / (this.containerHeight - this.sliderHeight)
-			const scrollTop =
-				scrollPercentage * (this.totalHeight - this.containerHeight)
-			this.virtualListScrollTop = scrollTop
-		},
-
-		onSliderTouchEnd() {
-			this.isDragging = false
-		},
 
 		updateSliderPosition(scrollTop) {
-			const scrollPercentage =
-				scrollTop / (this.totalHeight - this.containerHeight)
-			this.sliderPosition =
-				scrollPercentage * (this.containerHeight - this.sliderHeight)
+			if (this.totalHeight <= this.containerHeight) {
+				this.sliderPercentage = 0
+			} else {
+				const scrollPercentage =
+					scrollTop / (this.totalHeight - this.containerHeight)
+				this.sliderPercentage = Math.min(
+					100,
+					Math.max(0, scrollPercentage * 100),
+				)
+			}
+		},
+
+		onScroll(e) {
+			const scrollTop = Math.max(0, e.detail.scrollTop)
+			if (!this.isDragging) {
+				this.throttleUpdateVisibleItems(scrollTop)
+				this.updateSliderPosition(scrollTop)
+			}
+		},
+
+		onSliderChange(newValue) {
+			const scrollTop =
+				(newValue / 100) * (this.totalHeight - this.containerHeight)
+			this.virtualListScrollTop = scrollTop
+			this.updateVisibleItems(scrollTop) // 移除节流，直接更新
+		},
+		onSliderDragging(isDragging) {
+			this.isDragging = isDragging
+		},
+
+		// 新增方法：预加载项目
+		preloadItems(startIndex, endIndex) {
+			const preloadRange = 10 // 预加载的项目数量
+			const preloadStartIndex = Math.max(0, startIndex - preloadRange)
+			const preloadEndIndex = Math.min(
+				this.data.length - 1,
+				endIndex + preloadRange,
+			)
+
+			for (let i = preloadStartIndex; i <= preloadEndIndex; i++) {
+				if (!this.visibleItems.some((item) => item.id === this.data[i].id)) {
+					this.visibleItems.push({
+						...this.data[i],
+						top: this.getItemTop(this.data[i].id),
+					})
+				}
+			}
 		},
 	},
 }
@@ -232,24 +268,13 @@ export default {
       position: relative;
     }
   }
-  
+
   .slider-container {
     width: 20px;
     height: 100%;
     position: relative;
     background-color: #f0f0f0;
     border-radius: 10px;
-
-
-    .slider {
-      width: 100%;
-      background-color: pink;
-      position: absolute;
-      border-radius: 20px;
-      left: 0px;
-      height: 20px;
-      width: 20px;
-    }
   }
 }
 </style>

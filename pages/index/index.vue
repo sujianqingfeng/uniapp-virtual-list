@@ -1,6 +1,8 @@
 <template>
   <view class="content">
+    <view style="height: var(--status-bar-height);"></view>
     <view class="header">
+      
       <view class="title">VirtualList</view>
       <view class="info">
         <view>
@@ -14,20 +16,21 @@
     </view>
 
     <view class="list">
-      <VirtualList :data="list" @rangeChange="onRangeChange" @totalHeightChange="onTotalHeightChange">
+      <virtual-list :data="list" @rangeChange="onRangeChange" @totalHeightChange="onTotalHeightChange">
         <template #default="{ items }">
-          <VirtualItem v-for="item in items" :key="item.id" :id="item.id" :item="item">
-            <ChatItem :item="item" />
-          </VirtualItem>
+          <virtual-item v-for="item in items" :key="item.id" :id="item.id" :item="item">
+            <chat-item :item="item" />
+          </virtual-item>
         </template>
-      </VirtualList>
+      </virtual-list>
     </view>
   </view>
 </template>
 
 <script>
-import { VirtualList, VirtualItem } from "@/components/virtual-list"
 import ChatItem from "./components/ChatItem.vue"
+import VirtualList from "@/components/virtual-list/VirtualList.vue"
+import VirtualItem from "@/components/virtual-list/VirtualItem.vue"
 
 const randomString = () => {
 	const characters =
@@ -42,9 +45,9 @@ const randomString = () => {
 
 const list = Array.from({ length: 100 }, (_, i) => {
 	return {
-		name: `name-${i}`,
+		name: `name-${i + 1}`,
 		content: randomString(),
-		id: i,
+		id: i + 1,
 	}
 })
 
@@ -60,8 +63,6 @@ export default {
 			},
 		}
 	},
-	onLoad() {},
-	mounted() {},
 	methods: {
 		onTotalHeightChange(h) {
 			this.totalHeight = h
@@ -76,12 +77,12 @@ export default {
 
 <style scoped>
 page {
-  height: 100%;
+  height: 100vh;
 }
 
 .content {
   background-color: #f8f8f8;
-  height: 100%;
+  height: 100vh;
   display: flex;
   flex-direction: column;
   box-sizing: border-box;

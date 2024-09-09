@@ -1,6 +1,9 @@
 <template>
-  <view class="virtual-item" :class="'virtual-item-'+id" :style="{top: item.top + 'px'}" >
-    <slot/>
+  <view class="virtual-item" :class="'virtual-item-' + id" :style="{ top: item.top + 'px' }">
+    <template v-if="item">
+
+      <slot />
+    </template>
   </view>
 </template>
 
@@ -8,7 +11,7 @@
 <script>
 export default {
 	name: "VirtualItem",
-	inject: ["updateItemHeight"],
+	inject: ["updateItemHeight", "getItemHeightIsCalculated"],
 	props: {
 		id: {
 			type: [String, Number],
@@ -20,7 +23,9 @@ export default {
 		},
 	},
 	mounted() {
-		this.$nextTick(this.queryVirtualItemHeight)
+		if (!this.getItemHeightIsCalculated(this.id)) {
+			this.$nextTick(this.queryVirtualItemHeight)
+		}
 	},
 	methods: {
 		queryVirtualItemHeight() {
@@ -28,7 +33,6 @@ export default {
 			query
 				.select(`.virtual-item-${this.id}`)
 				.boundingClientRect((rect) => {
-					// console.log("🚀 ~ queryVirtualItemHeight ~ rect:", this.id, rect)
 					if (rect && this.updateItemHeight) {
 						this.updateItemHeight(this.id, rect.height)
 					}

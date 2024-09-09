@@ -5,7 +5,10 @@
 			"style": {
 				"navigationBarTitleText": "virtual-list",
 				"navigationStyle": "custom",
-				"disabledScroll": true
+				"disabledScroll": true,
+				"app-plus": {
+					"bounce": false
+				}
 			}
 		}
 	],
