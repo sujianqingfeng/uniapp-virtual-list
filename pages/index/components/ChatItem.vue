@@ -1,7 +1,7 @@
 <template>
   <view class="chat-item">
     <view class="chat-item-header">
-      <view class="name">{{item.name}}</view>
+      <view class="name">{{item.name}}-{{item.top}}-{{item.height}}</view>
     </view>
     <view class="chat-item-content">
       {{ item.content }}
@@ -40,6 +40,8 @@ export default {
     border-radius: 10px;
     white-space: pre-wrap;
     word-wrap: break-word;
+    line-height: 16px;
+    line-height: 20px;
   }
 }
 </style>

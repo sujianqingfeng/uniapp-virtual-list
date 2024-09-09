@@ -30,7 +30,7 @@ export default {
 		},
 		estimatedHeight: {
 			type: Number,
-			default: 100,
+			default: 95,
 		},
 	},
 	data() {
@@ -40,30 +40,26 @@ export default {
 			startIndex: 0,
 			endIndex: 0,
 			itemHeights: {},
-			lastScrollTop: 0,
 			totalHeight: 0,
 			virtualListScrollTop: 0,
 			sliderPercentage: 0,
 			isDragging: false,
-			bufferSize: 5, // 新增：缓冲区大小
-			calculatedHeights: {}, // New property to store calculated heights
-		}
-	},
-	provide() {
-		return {
-			updateItemHeight: this.updateItemHeight,
-			getItemHeightIsCalculated: this.getItemHeightIsCalculated,
+			bufferSize: 10, // 新增：缓冲区大小
+			updateQueue: [],
+			isUpdating: false,
 		}
 	},
 	mounted() {
-		this.queryContainerHeight()
-		this.initializeItemHeights()
+		// this.queryContainerHeight()
+		// this.initializeItemHeights()
 	},
 	watch: {
 		data: {
-			handler() {
+			handler(value) {
+				console.log("🚀 ~ handler ~ value:", value)
+				this.queryContainerHeight()
 				this.initializeItemHeights()
-				this.updateVisibleItems(this.lastScrollTop || 0)
+				this.queueUpdate(0)
 			},
 			deep: true,
 			immediate: true,
@@ -82,26 +78,17 @@ export default {
 				.boundingClientRect((res) => {
 					if (res) {
 						this.containerHeight = res.height
-						this.updateVisibleItems(0)
+						// this.updateVisibleItems(0)
 					}
 				})
 				.exec()
 		},
 		initializeItemHeights() {
 			this.itemHeights = this.data.reduce((acc, item) => {
-				acc[item.id] = this.estimatedHeight
+				acc[item.id] = item.height || this.estimatedHeight
 				return acc
 			}, {})
 			this.updateTotalHeight()
-		},
-		getItemHeightIsCalculated(id) {
-			return this.calculatedHeights[id]
-		},
-		updateItemHeight(id, height) {
-			this.calculatedHeights[id] = true
-			this.itemHeights[id] = height
-			this.updateTotalHeight()
-			this.updateVisibleItems(this.lastScrollTop || 0)
 		},
 		updateTotalHeight() {
 			this.totalHeight = Object.values(this.itemHeights).reduce(
@@ -118,33 +105,6 @@ export default {
 				top += this.itemHeights[this.data[i].id] || this.estimatedHeight
 			}
 			return top
-		},
-		updateVisibleItems(scrollTop) {
-			this.lastScrollTop = scrollTop
-			const startIndex = Math.max(
-				0,
-				this.findStartIndex(scrollTop) - this.bufferSize,
-			)
-			const endIndex = Math.min(
-				this.data.length - 1,
-				this.findEndIndex(scrollTop + this.containerHeight, startIndex) +
-					this.bufferSize,
-			)
-
-			this.$emit("rangeChange", {
-				startIndex,
-				endIndex: endIndex + 1,
-			})
-
-			this.visibleItems = this.data
-				.slice(startIndex, endIndex + 1)
-				.map((item) => ({
-					...item,
-					top: this.getItemTop(item.id),
-				}))
-
-			// 新增：预加载项目
-			this.preloadItems(startIndex, endIndex)
 		},
 		findStartIndex(scrollTop) {
 			// 使用预设高度估算初始 low 值
@@ -198,7 +158,7 @@ export default {
 			function (scrollTop) {
 				this.updateVisibleItems(scrollTop)
 			},
-			20,
+			100,
 			{ heading: true },
 		),
 
@@ -218,12 +178,82 @@ export default {
 		onScroll(e) {
 			const scrollTop = Math.max(0, e.detail.scrollTop)
 			if (!this.isDragging) {
-				this.throttleUpdateVisibleItems(scrollTop)
 				this.updateSliderPosition(scrollTop)
+				this.queueUpdate(scrollTop)
 			}
 		},
 
+		queueUpdate(scrollTop) {
+			this.updateQueue.push(scrollTop)
+			this.processUpdateQueue()
+		},
+
+		processUpdateQueue() {
+			if (this.isUpdating || this.updateQueue.length === 0) {
+				return
+			}
+
+			this.isUpdating = true
+			console.log("🚀 ~ processUpdateQueue ~ isUpdating:", true)
+			const scrollTop = this.updateQueue[this.updateQueue.length - 1] // Get the latest scroll position
+			this.updateQueue = [] // Clear the queue
+
+			this.throttledUpdateVisibleItems(scrollTop, () => {
+				setTimeout(() => {
+					this.isUpdating = false
+					console.log("🚀 ~ processUpdateQueue ~ isUpdating:", false)
+					if (this.updateQueue.length > 0) {
+						this.processUpdateQueue() // Process any new updates that came in
+					}
+				}, 10)
+			})
+		},
+
+		throttledUpdateVisibleItems: throttle(
+			function (scrollTop, callback) {
+				this.updateVisibleItems(scrollTop)
+				if (callback) callback()
+			},
+			50,
+			{ leading: true },
+		),
+
+		async updateVisibleItems(scrollTop) {
+			console.log("🚀 ~ updateVisibleItems ~ scrollTop:", scrollTop)
+
+			const startIndex = Math.max(
+				0,
+				this.findStartIndex(scrollTop) - this.bufferSize,
+			)
+			const endIndex = Math.min(
+				this.data.length - 1,
+				this.findEndIndex(scrollTop + this.containerHeight, startIndex) +
+					this.bufferSize,
+			)
+
+			const newVisibleItems = this.data
+				.slice(startIndex, endIndex + 1)
+				.map((item) => ({
+					...item,
+					top: this.getItemTop(item.id),
+				}))
+
+			// 简化的更新逻辑
+			this.visibleItems = newVisibleItems.map((newItem) => {
+				const existingItem = this.visibleItems.find(
+					(item) => item.id === newItem.id,
+				)
+				if (existingItem && existingItem.height === newItem.height) {
+					return existingItem // 如果 id 和高度都没变，保留现��项
+				}
+				return newItem // 否则使用新项
+			})
+
+			this.$emit("rangeChange", { startIndex, endIndex: endIndex + 1 })
+		},
+
 		onSliderChange(newValue) {
+			console.log("🚀 ~ onSliderChange ~ newValue:", newValue)
 			const scrollTop =
 				(newValue / 100) * (this.totalHeight - this.containerHeight)
 			this.virtualListScrollTop = scrollTop
@@ -231,25 +261,6 @@ export default {
 		},
 		onSliderDragging(isDragging) {
 			this.isDragging = isDragging
-		},
-
-		// 新增方法：预加载项目
-		preloadItems(startIndex, endIndex) {
-			const preloadRange = 10 // 预加载的项目数量
-			const preloadStartIndex = Math.max(0, startIndex - preloadRange)
-			const preloadEndIndex = Math.min(
-				this.data.length - 1,
-				endIndex + preloadRange,
-			)
-
-			for (let i = preloadStartIndex; i <= preloadEndIndex; i++) {
-				if (!this.visibleItems.some((item) => item.id === this.data[i].id)) {
-					this.visibleItems.push({
-						...this.data[i],
-						top: this.getItemTop(this.data[i].id),
-					})
-				}
-			}
 		},
 	},
 }

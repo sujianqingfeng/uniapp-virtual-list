@@ -16,6 +16,7 @@
     </view>
 
     <view class="list">
+      <CalcChatItem @measure="onMeasure" />
       <virtual-list :data="list" @rangeChange="onRangeChange" @totalHeightChange="onTotalHeightChange">
         <template #default="{ items }">
           <virtual-item v-for="item in items" :key="item.id" :id="item.id" :item="item">
@@ -31,6 +32,7 @@
 import ChatItem from "./components/ChatItem.vue"
 import VirtualList from "@/components/virtual-list/VirtualList.vue"
 import VirtualItem from "@/components/virtual-list/VirtualItem.vue"
+import CalcChatItem from "./components/CalcChatItem.vue"
 
 const randomString = () => {
 	const characters =
@@ -43,16 +45,17 @@ const randomString = () => {
 	return result
 }
 
-const list = Array.from({ length: 100 }, (_, i) => {
+const list = Array.from({ length: 3000 }, (_, i) => {
 	return {
 		name: `name-${i + 1}`,
 		content: randomString(),
 		id: i + 1,
+		height: 100,
 	}
 })
 
 export default {
-	components: { VirtualList, VirtualItem, ChatItem },
+	components: { VirtualList, VirtualItem, ChatItem, CalcChatItem },
 	data() {
 		return {
 			list,
@@ -64,6 +67,36 @@ export default {
 		}
 	},
 	methods: {
+		onMeasure({ width, measures }) {
+			this.list = this.list.map((item) => ({
+				...item,
+				height: this.calculateItemHeight(item.content, width, measures),
+			}))
+		},
+		calculateItemHeight(content, width, measures) {
+			const baseHeight = 75 // Base height for padding and margins
+			const lineHeight = 20 // Approximate line height
+
+			let totalWidth = 0
+			let lines = 1
+
+			for (const char of content) {
+				if (char >= "0" && char <= "9") {
+					totalWidth += measures.number
+				} else if (/[a-zA-Z]/.test(char)) {
+					totalWidth += measures.english
+				} else {
+					totalWidth += measures.chinese
+				}
+
+				if (totalWidth > width) {
+					lines++
+					totalWidth = 0
+				}
+			}
+
+			return baseHeight + lines * lineHeight
+		},
 		onTotalHeightChange(h) {
 			this.totalHeight = h
 		},

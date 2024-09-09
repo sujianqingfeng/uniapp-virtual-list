@@ -30,6 +30,7 @@ export default {
 			percentage: 0,
 			innerContainerRect: null,
 			throttledUpdateSliderPosition: null,
+			lastClientY: null,
 		}
 	},
 	created() {
@@ -71,6 +72,7 @@ export default {
 		},
 		onSliderTouchStart(e) {
 			this.isDragging = true
+			this.lastClientY = e.touches[0].clientY
 			this.updateSliderPosition(e.touches[0].clientY)
 		},
 		onSliderTouchMove(e) {
@@ -80,12 +82,21 @@ export default {
 		},
 		onSliderTouchEnd() {
 			this.isDragging = false
+			this.lastClientY = null
 			this.$emit("dragging", false)
 		},
 		updateSliderPosition(clientY) {
 			if (!this.innerContainerRect) return
+
+			const maxMove = 10 // 最大移动距离（像素）
+			const actualMove = clientY - (this.lastClientY || clientY)
+			const clampedMove = Math.max(-maxMove, Math.min(maxMove, actualMove))
+
+			const newClientY = (this.lastClientY || clientY) + clampedMove
+			this.lastClientY = newClientY
+
 			const percentage =
-				((clientY - this.innerContainerRect.top) /
+				((newClientY - this.innerContainerRect.top) /
 					this.innerContainerRect.height) *
 				100
 			this.updatePercentage(percentage)
@@ -115,7 +126,7 @@ export default {
     height: 20px;
     width: 20px;
     transform: translateY(-50%);
-    transition: none; // Remove transition for instant response
+    transition: all 0.3s;
   }
 }
 </style>
