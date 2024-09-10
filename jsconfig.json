@@ -9,10 +9,7 @@
     },
     "lib": ["esnext", "dom", "dom.iterable", "scripthost"]
   },
-  "exclude": [
-    "uni_modules",
-    "unpackage"
-  ],
+  "exclude": ["uni_modules", "unpackage"],
   "vueCompilerOptions": {
     "target": 2
   }
