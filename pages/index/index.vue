@@ -1,6 +1,6 @@
 <template>
   <view class="content">
-    <view style="height: var(--status-bar-height);"></view>
+    <view style="height: var(--status-bar-height)"></view>
     <view class="header">
       
       <view class="title">VirtualList</view>
@@ -37,7 +37,7 @@ import CalcChatItem from "./components/CalcChatItem.vue"
 const randomString = () => {
 	const characters =
 		"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
-	const length = Math.floor(Math.random() * (200 - 100 + 1)) + 10 // Random length between 100 and 200
+	const length = Math.floor(Math.random() * (200 - 100 + 1)) + 10
 	let result = ""
 	for (let i = 0; i < length; i++) {
 		result += characters.charAt(Math.floor(Math.random() * characters.length))
@@ -67,13 +67,14 @@ export default {
 		}
 	},
 	methods: {
-		onMeasure({ width, measures }) {
+		onMeasure({ width, measures,baseHeight }) {
 			this.list = this.list.map((item) => ({
 				...item,
-				height: this.calculateItemHeight(item.content, width, measures),
+				height: this.calculateItemHeight(item.content, width - 25, measures, baseHeight),
 			}))
 		},
-		calculateItemHeight(content, width, measures) {
+		calculateItemHeight(content, width, measures, ) {
+			// console.log("🚀 ~ calculateItemHeight ~ baseHeight:", baseHeight)
 			const baseHeight = 75 // Base height for padding and margins
 			const lineHeight = 20 // Approximate line height
 
@@ -83,9 +84,11 @@ export default {
 			for (const char of content) {
 				if (char >= "0" && char <= "9") {
 					totalWidth += measures.number
-				} else if (/[a-zA-Z]/.test(char)) {
+				} else if (/[A-Z]/.test(char)) {
 					totalWidth += measures.english
-				} else {
+				}else if (/[a-z]/.test(char)) {
+          totalWidth += measures.english2
+        }else {
 					totalWidth += measures.chinese
 				}
 
@@ -129,7 +132,6 @@ page {
     .title {
       font-size: 32px;
       font-weight: bold;
-
     }
   }
 

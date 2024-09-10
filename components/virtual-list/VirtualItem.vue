@@ -1,5 +1,5 @@
 <template>
-  <view class="virtual-item" :class="'virtual-item-' + id" :style="{ top: item.top + 'px', height: item.height + 'px' }">
+  <view class="virtual-item" :class="'virtual-item-' + id" :style="{  height: item.height + 'px', top: item.top + 'px' }">
     <template v-if="item">
       <slot />
     </template>

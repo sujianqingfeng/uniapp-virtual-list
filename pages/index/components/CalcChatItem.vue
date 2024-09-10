@@ -1,10 +1,13 @@
 <template>
   <view class="calc-chat-item" v-if="show">
+    <view class="calc-chat-item-header">
+      <view class="name">name</view>
+    </view>
     <view class="calc-chat-item-content">
-      <view>
-        <text>放放哈哈哈放哈哈哈放哈哈哈放哈哈哈哈放哈哈，</text>
+      <view class="calc-chat-item-content-inner">
+        <text v-for="(char, index) in measureChars" :key="index"
+          :class="['calc-chat-item-content-text', `char-text-${index}`]">{{ char }}</text>
       </view>
-      <canvas  style="width: 100%; height: 20px; " canvas-id="canvas" id="canvas"></canvas>
     </view>
   </view>
 </template>
@@ -12,50 +15,73 @@
 
 <script>
 export default {
-	name: "CalcChatItem",
-	data() {
-		return {
-			show: true,
-		}
-	},
-	mounted() {
-		this.queryContentRect()
-	},
-	methods: {
-		queryContentRect() {
-			const query = uni.createSelectorQuery().in(this)
-			query
-				.select(".calc-chat-item-content")
-				.boundingClientRect((rect) => {
-					this.measureText(rect)
-				})
-				.exec()
-		},
-		measureText({ width }) {
-			const ctx = uni.createCanvasContext("canvas")
-			ctx.setFontSize(16)
+  name: "CalcChatItem",
+  data() {
+    return {
+      show: true,
+      itemHeight: 0,
+      measureChars: ['A', '中', '1','a'],
+    }
+  },
+  mounted() {
+    this.$nextTick(() => {
+      this.queryContentRect()
+    })
+  },
+  methods: {
+    queryContentRect() {
+      const query = uni.createSelectorQuery().in(this)
 
-			const characters = {
-				chinese: "中",
-				number: "0",
-				english: "A",
-			}
+      query.select('.calc-chat-item').boundingClientRect((rect) => {
+        this.itemHeight = rect.height
+      }).exec()
 
-			const measures = {}
+      query
+        .select(".calc-chat-item-content-inner")
+        .boundingClientRect((rect) => {
+          this.calculateMeasurements(rect)
+        })
+        .exec()
+    },
+    calculateMeasurements({ width, height }) {
+      const totalWidth = width
+      const charHeight = height
 
-			for (const [type, char] of Object.entries(characters)) {
-				const metrics = ctx.measureText(char)
-				measures[type] = metrics.width
-			}
+      const query = uni.createSelectorQuery().in(this)
 
-			this.$emit("measure", {
-				width: width - 20,
-				measures,
-			})
+      for (let i = 0; i < this.measureChars.length; i++) {
+        query
+          .select(`.char-text-${i}`)
+          .boundingClientRect()
+      }
 
-			this.show = false
-		},
-	},
+      query
+        .exec(rects => {
+          if (rects.length === this.measureChars.length) {
+            const [englishRect, chineseRect, numberRect, englishRect2] = rects
+
+            const englishWidth = englishRect.width
+            const chineseWidth = chineseRect.width
+            const numberWidth = numberRect.width
+            const englishWidth2 = englishRect2.width
+
+            this.$emit("measure", {
+              width: totalWidth,
+              baseHeight: this.itemHeight - charHeight,
+              measures: {
+                english: englishWidth,
+                english2: englishWidth2,
+                chinese: chineseWidth,
+                number: numberWidth,
+              },
+            })
+
+          }
+        })
+
+      this.show = false
+    },
+  },
 }
 </script>
 
@@ -64,7 +90,6 @@ export default {
   width: 100%;
   padding: 10px 20px;
   box-sizing: border-box;
-  // display: none;
   opacity: 0;
   position: absolute;
 
@@ -84,4 +109,3 @@ export default {
   }
 }
 </style>
-

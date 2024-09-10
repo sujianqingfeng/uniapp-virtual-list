@@ -2,7 +2,7 @@
   <view class="wrapper-container">
     <scroll-view class="virtual-list" :scroll-y="true" @scroll="onScroll" :scroll-top="virtualListScrollTop"
       scroll-with-animation>
-      <view class="list-container" :style="{ height: totalHeight + 'px', paddingTop: topPadding + 'px' }">
+      <view class="list-container" :style="{ height: totalHeight + 'px' }">
         <slot :items="visibleItems" />
       </view>
     </scroll-view>
@@ -30,7 +30,7 @@ export default {
 		},
 		estimatedHeight: {
 			type: Number,
-			default: 95,
+			default: 90,
 		},
 	},
 	data() {
@@ -47,7 +47,6 @@ export default {
 			bufferSize: 10, // 新增：缓冲区大小
 			updateQueue: [],
 			isUpdating: false,
-			topPadding: 0,
 		}
 	},
 	mounted() {
@@ -57,7 +56,7 @@ export default {
 	watch: {
 		data: {
 			handler(value) {
-				console.log("🚀 ~ handler ~ value:", value)
+				// console.log("🚀 ~ handler ~ value:", value)
 				this.queryContainerHeight()
 				this.initializeItemHeights()
 				this.queueUpdate(0)
@@ -220,31 +219,34 @@ export default {
 		),
 
 		async updateVisibleItems(scrollTop) {
-			// console.log("🚀 ~ updateVisibleItems ~ scrollTop:", scrollTop)
-
 			const startIndex = Math.max(
 				0,
-				this.findStartIndex(scrollTop) - this.bufferSize,
+				this.findStartIndex(scrollTop) - this.bufferSize
 			)
 			const endIndex = Math.min(
 				this.data.length - 1,
 				this.findEndIndex(scrollTop + this.containerHeight, startIndex) +
-					this.bufferSize,
+					this.bufferSize
 			)
 
-			this.topPadding = this.getItemTop(this.data[startIndex].id)
-
-			const newVisibleItems = this.data
-				.slice(startIndex, endIndex + 1)
-				.map((item) => ({
+			const topPadding = this.getItemTop(this.data[startIndex].id)
+			
+			const newVisibleItems = []
+			let currentTop = topPadding
+			for (let i = startIndex; i <= endIndex; i++) {
+				const item = this.data[i]
+				const height = this.itemHeights[item.id] || this.estimatedHeight
+				newVisibleItems.push({
 					...item,
-					top: this.getItemTop(item.id),
-				}))
+					top: currentTop,
+				})
+				currentTop += height
+			}
 
 			// 简化的更新逻辑
 			this.visibleItems = newVisibleItems.map((newItem) => {
 				const existingItem = this.visibleItems.find(
-					(item) => item.id === newItem.id,
+					(item) => item.id === newItem.id
 				)
 				if (existingItem && existingItem.height === newItem.height) {
 					return existingItem // 如果 id 和高度都没变，保留现有项
@@ -256,11 +258,11 @@ export default {
 		},
 
 		onSliderChange(newValue) {
-			console.log("🚀 ~ onSliderChange ~ newValue:", newValue)
 			const scrollTop =
 				(newValue / 100) * (this.totalHeight - this.containerHeight)
 			this.virtualListScrollTop = scrollTop
-			this.updateVisibleItems(scrollTop) // 移除节流，直接更新
+
+      this.queueUpdate(scrollTop)
 		},
 		onSliderDragging(isDragging) {
 			this.isDragging = isDragging

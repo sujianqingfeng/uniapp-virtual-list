@@ -5,9 +5,9 @@
       <view
         class="slider"
         :style="{ top: `${sliderPosition}%` }"
-        @touchstart.stop="onSliderTouchStart"
-        @touchmove.stop="onSliderTouchMove"
-        @touchend.stop="onSliderTouchEnd"
+        @touchstart="onSliderTouchStart"
+        @touchmove="onSliderTouchMove"
+        @touchend="onSliderTouchEnd"
       ></view>
     </view>
   </view>
